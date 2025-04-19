@@ -9,7 +9,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-	title: "Fix-it - Connect with Service Providers",
+	title: "ServiceHub - Connect with Service Providers",
 	description: "Book services from trusted professionals in your area",
 	generator: "lastSaint",
 };
