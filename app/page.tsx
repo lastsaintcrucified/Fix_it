@@ -1,13 +1,6 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import {
-	CalendarClock,
-	CheckCircle,
-	Clock,
-	Drill,
-	Shield,
-	Star,
-} from "lucide-react";
+import { CalendarClock, CheckCircle, Clock, Shield, Star } from "lucide-react";
 
 export default function Home() {
 	return (
@@ -15,8 +8,8 @@ export default function Home() {
 			<header className='sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60'>
 				<div className='container flex h-16 items-center justify-between'>
 					<div className='flex items-center gap-2'>
-						<Drill className='h-10 w-10' />
-						<span className='text-2xl font-bold'>Fix-it</span>
+						<Shield className='h-6 w-6' />
+						<span className='text-xl font-bold'>ServiceHub</span>
 					</div>
 					<nav className='hidden md:flex items-center gap-6 text-sm'>
 						<Link
