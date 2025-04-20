@@ -13,6 +13,7 @@ import {
 } from "firebase/auth";
 import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "./firebase";
+import { useRouter } from "next/navigation";
 
 type UserRole = "client" | "provider" | "admin";
 
@@ -47,6 +48,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 	const [user, setUser] = useState<User | null>(null);
 	const [userData, setUserData] = useState<UserData | null>(null);
 	const [loading, setLoading] = useState(true);
+	const router = useRouter();
 
 	useEffect(() => {
 		const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -102,6 +104,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 			await setDoc(doc(db, "users", user.uid), userData);
 
 			setUserData(userData);
+
+			// Redirect based on role
+			if (role === "client") {
+				router.push("/client-dashboard");
+			} else if (role === "provider") {
+				router.push("/dashboard");
+			}
 		} catch (error) {
 			console.error("Error signing up:", error);
 			throw error;
@@ -111,6 +120,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 	const login = async (email: string, password: string) => {
 		try {
 			await signInWithEmailAndPassword(auth, email, password);
+			// Redirection will happen in the login component based on user role
 		} catch (error) {
 			console.error("Error logging in:", error);
 			throw error;
@@ -120,6 +130,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 	const logout = async () => {
 		try {
 			await signOut(auth);
+			router.push("/");
 		} catch (error) {
 			console.error("Error logging out:", error);
 			throw error;

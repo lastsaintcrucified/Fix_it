@@ -2,7 +2,7 @@
 
 import type React from "react";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -25,9 +25,20 @@ export default function LoginPage() {
 	const [password, setPassword] = useState("");
 	const [isLoading, setIsLoading] = useState(false);
 
-	const { login } = useAuth();
+	const { login, user, userData } = useAuth();
 	const { toast } = useToast();
 	const router = useRouter();
+
+	// Redirect if already logged in
+	useEffect(() => {
+		if (user) {
+			if (userData?.role === "client") {
+				router.push("/client-dashboard");
+			} else if (userData?.role === "provider") {
+				router.push("/dashboard");
+			}
+		}
+	}, [user, userData, router]);
 
 	const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
 		event.preventDefault();
@@ -41,8 +52,12 @@ export default function LoginPage() {
 				description: "You have successfully logged in.",
 			});
 
-			// Redirect to dashboard
-			router.push("/dashboard");
+			// Redirect based on user role
+			if (userData?.role === "client") {
+				router.push("/client-dashboard");
+			} else {
+				router.push("/dashboard");
+			}
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		} catch (error: any) {
 			toast({
@@ -85,7 +100,7 @@ export default function LoginPage() {
 								required
 							/>
 						</div>
-						<div className='grid gap-2 mb-4'>
+						<div className='grid gap-2'>
 							<div className='flex items-center justify-between'>
 								<Label htmlFor='password'>Password</Label>
 								<Link
