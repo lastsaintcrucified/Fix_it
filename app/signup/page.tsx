@@ -79,7 +79,7 @@ export default function SignupPage() {
 				className='absolute left-4 top-4 md:left-8 md:top-8 flex items-center gap-2'
 			>
 				<Shield className='h-6 w-6' />
-				<span className='text-lg font-bold'>ServiceHub</span>
+				<span className='text-lg font-bold'>Fix-it</span>
 			</Link>
 			<Card className='w-full max-w-md'>
 				<CardHeader className='space-y-1'>

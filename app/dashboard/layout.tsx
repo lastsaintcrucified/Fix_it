@@ -69,7 +69,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 				<div className='container flex h-16 items-center justify-between'>
 					<div className='flex items-center gap-2'>
 						<Shield className='h-6 w-6' />
-						<span className='text-xl font-bold'>ServiceHub</span>
+						<span className='text-xl font-bold'>Fix-it</span>
 					</div>
 					<div className='flex items-center gap-4'>
 						<Button

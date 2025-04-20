@@ -9,7 +9,7 @@ export default function Home() {
 				<div className='container flex h-16 items-center justify-between'>
 					<div className='flex items-center gap-2'>
 						<Shield className='h-6 w-6' />
-						<span className='text-xl font-bold'>ServiceHub</span>
+						<span className='text-xl font-bold'>Fix-it</span>
 					</div>
 					<nav className='hidden md:flex items-center gap-6 text-sm'>
 						<Link
