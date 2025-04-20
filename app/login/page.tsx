@@ -46,18 +46,19 @@ export default function LoginPage() {
 
 		try {
 			await login(email, password);
-
+			// Redirect based on user role
+			if (userData?.role === "client") {
+				console.log(userData, "Client role detected");
+				router.push("/client-dashboard");
+			} else {
+				console.log(userData, "Provider role detected");
+				router.push("/dashboard");
+			}
 			toast({
 				title: "Logged in",
 				description: "You have successfully logged in.",
 			});
 
-			// Redirect based on user role
-			if (userData?.role === "client") {
-				router.push("/client-dashboard");
-			} else {
-				router.push("/dashboard");
-			}
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		} catch (error: any) {
 			toast({

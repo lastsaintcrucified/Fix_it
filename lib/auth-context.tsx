@@ -60,9 +60,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				const userDoc = await getDoc(userDocRef);
 
 				if (userDoc.exists()) {
+					console.log(userDoc.data(), "User data fetched from Firestore");
+					// Set user data in state
 					setUserData(userDoc.data() as UserData);
 				}
 			} else {
+				console.log("No user signed in");
+				// User is signed out, set userData to null
 				setUserData(null);
 			}
 
@@ -117,10 +121,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 		}
 	};
 
-	const login = async (email: string, password: string) => {
+	const login = async (email: string, password: string): Promise<void> => {
 		try {
-			await signInWithEmailAndPassword(auth, email, password);
-			// Redirection will happen in the login component based on user role
+			const userCredential = await signInWithEmailAndPassword(
+				auth,
+				email,
+				password
+			);
+			const user = userCredential.user;
+			console.log(user, "User logged in");
+
+			// Fetch user data from Firestore
+			const userDocRef = doc(db, "users", user.uid);
+			const userDoc = await getDoc(userDocRef);
+
+			if (userDoc.exists()) {
+				console.log(userDoc.data(), "User data fetched from Firestore");
+				// Set user data in state
+				setUserData(userDoc.data() as UserData);
+			} else {
+				console.log("No such document!");
+			}
 		} catch (error) {
 			console.error("Error logging in:", error);
 			throw error;
