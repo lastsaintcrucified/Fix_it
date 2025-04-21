@@ -3,19 +3,19 @@
 
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
 import {
 	Calendar,
 	Clock,
 	MapPin,
 	MoreHorizontal,
 	Search,
+	Play,
 	CheckCircle,
-	Loader2,
 } from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -36,38 +36,18 @@ import {
 	serverTimestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import Link from "next/link";
-import {
-	Dialog,
-	DialogContent,
-	DialogDescription,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { createReview } from "@/lib/client-db";
-// import { useRouter } from "next/navigation";
 
-export default function ClientBookingsPage() {
+export default function ProviderBookingsPage() {
 	const [searchTerm, setSearchTerm] = useState("");
 	const [bookings, setBookings] = useState<any[]>([]);
 	const [filteredBookings, setFilteredBookings] = useState<any[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [activeTab, setActiveTab] = useState("upcoming");
 	const [selectedBooking, setSelectedBooking] = useState<any>(null);
-	const [cancellationReason, setCancellationReason] = useState("");
 	const [isUpdating, setIsUpdating] = useState(false);
-	const [reviewDialog, setReviewDialog] = useState<any>(null);
-	const [reviewBooking, setReviewBooking] = useState<any>(null);
-	const [reviewRating, setReviewRating] = useState(5);
-	const [reviewText, setReviewText] = useState("");
-	const [isSubmitting, setIsSubmitting] = useState(false);
 
 	const { user } = useAuth();
 	const { toast } = useToast();
-	// const router = useRouter();
 
 	useEffect(() => {
 		if (user) {
@@ -87,7 +67,7 @@ export default function ClientBookingsPage() {
 			const bookingsRef = collection(db, "bookings");
 			const q = query(
 				bookingsRef,
-				where("clientId", "==", user.uid),
+				where("providerId", "==", user.uid),
 				orderBy("date", "desc")
 			);
 
@@ -96,8 +76,6 @@ export default function ClientBookingsPage() {
 
 			querySnapshot.forEach((doc) => {
 				const data = doc.data();
-				// console.log(data, "Booking data fetched from Firestore");
-				// Convert Firestore timestamp to JavaScript Date object
 				bookingsList.push({
 					id: doc.id,
 					...data,
@@ -122,15 +100,15 @@ export default function ClientBookingsPage() {
 		if (!bookings) return;
 
 		let filtered = [...bookings];
-		// console.log("Filtering ghgfhgfh", filtered);
 
 		// Filter by search term
 		if (searchTerm) {
 			const term = searchTerm.toLowerCase();
-			filtered = filtered?.filter(
+			filtered = filtered.filter(
 				(booking) =>
 					booking.serviceName?.toLowerCase().includes(term) ||
-					booking.providerName?.toLowerCase().includes(term)
+					booking.clientName?.toLowerCase().includes(term) ||
+					booking.clientEmail?.toLowerCase().includes(term)
 			);
 		}
 
@@ -138,25 +116,22 @@ export default function ClientBookingsPage() {
 		const now = new Date();
 		switch (activeTab) {
 			case "upcoming":
-				// console.log("Filtering upcoming bookings", filtered);
-				filtered = filtered?.filter(
+				filtered = filtered.filter(
 					(booking) =>
 						(booking.date > now || isSameDay(booking.date, now)) &&
-						(booking.status === "pending" ||
-							booking.status === "confirmed" ||
-							booking.status === "in_progress")
+						(booking.status === "pending" || booking.status === "confirmed")
 				);
-				// console.log("Filtered upcoming bookings", filtered);
 				break;
-			case "past":
-				filtered = filtered?.filter(
-					(booking) => booking.status === "completed"
+			case "ongoing":
+				filtered = filtered.filter(
+					(booking) => booking.status === "in_progress"
 				);
+				break;
+			case "completed":
+				filtered = filtered.filter((booking) => booking.status === "completed");
 				break;
 			case "cancelled":
-				filtered = filtered?.filter(
-					(booking) => booking.status === "cancelled"
-				);
+				filtered = filtered.filter((booking) => booking.status === "cancelled");
 				break;
 		}
 
@@ -208,9 +183,9 @@ export default function ClientBookingsPage() {
 			case "confirmed":
 				return "default";
 			case "in_progress":
-				return "default"; // Map "warning" to a supported variant
+				return "outline"; // Map "warning" to "outline"
 			case "completed":
-				return "secondary"; // Map "success" to a supported variant
+				return "default"; // Map "success" to "default"
 			case "cancelled":
 				return "destructive";
 			default:
@@ -218,42 +193,42 @@ export default function ClientBookingsPage() {
 		}
 	};
 
-	const handleCancelBooking = async () => {
-		if (!selectedBooking) return;
-
+	const handleStartService = async (booking: any) => {
+		setSelectedBooking(booking);
 		setIsUpdating(true);
+
 		try {
-			const bookingRef = doc(db, "bookings", selectedBooking.id);
+			const bookingRef = doc(db, "bookings", booking.id);
 			await updateDoc(bookingRef, {
-				status: "cancelled",
-				reason: cancellationReason,
+				status: "in_progress",
+				startedAt: serverTimestamp(),
 				updatedAt: serverTimestamp(),
 			});
 
 			toast({
-				title: "Booking Cancelled",
-				description: "Your booking has been cancelled successfully",
+				title: "Service Started",
+				description: "The service has been marked as in progress",
 			});
 
 			// Refresh bookings
 			fetchBookings();
-			setSelectedBooking(null);
-			setCancellationReason("");
 		} catch (error) {
-			console.error("Error cancelling booking:", error);
+			console.error("Error starting service:", error);
 			toast({
 				title: "Error",
-				description: "Failed to cancel booking",
+				description: "Failed to start service",
 				variant: "destructive",
 			});
 		} finally {
 			setIsUpdating(false);
+			setSelectedBooking(null);
 		}
 	};
 
 	const handleCompleteService = async (booking: any) => {
+		setSelectedBooking(booking);
 		setIsUpdating(true);
-		setReviewBooking(booking);
+
 		try {
 			const bookingRef = doc(db, "bookings", booking.id);
 			await updateDoc(bookingRef, {
@@ -269,8 +244,6 @@ export default function ClientBookingsPage() {
 
 			// Refresh bookings
 			fetchBookings();
-			setReviewDialog(true);
-			// router.push("/client-dashboard/reviews?service=" + booking.serviceId);
 		} catch (error) {
 			console.error("Error completing service:", error);
 			toast({
@@ -280,43 +253,7 @@ export default function ClientBookingsPage() {
 			});
 		} finally {
 			setIsUpdating(false);
-		}
-	};
-
-	const handleSubmitReview = async (pendingReview: any) => {
-		if (!user) return;
-
-		setIsSubmitting(true);
-		try {
-			await createReview({
-				serviceId: pendingReview.serviceId,
-				serviceName: pendingReview.serviceName,
-				providerId: pendingReview.providerId,
-				providerName: pendingReview.providerName,
-				clientId: user.uid,
-				clientName: user.displayName || "Client",
-				rating: reviewRating,
-				comment: reviewText,
-			});
-
-			toast({
-				title: "Review submitted",
-				description: "Your review has been submitted successfully",
-			});
-
-			setReviewText("");
-			setReviewRating(5);
-			setReviewDialog(null);
-			setReviewBooking(null);
-		} catch (error) {
-			console.error("Error submitting review:", error);
-			toast({
-				title: "Error",
-				description: "Failed to submit review",
-				variant: "destructive",
-			});
-		} finally {
-			setIsSubmitting(false);
+			setSelectedBooking(null);
 		}
 	};
 
@@ -324,10 +261,8 @@ export default function ClientBookingsPage() {
 		<div className='flex flex-col gap-6'>
 			<div className='flex flex-col gap-2 md:flex-row md:items-center md:justify-between'>
 				<div>
-					<h1 className='text-3xl font-bold tracking-tight'>My Bookings</h1>
-					<p className='text-muted-foreground'>
-						View and manage your service bookings
-					</p>
+					<h1 className='text-3xl font-bold tracking-tight'>Bookings</h1>
+					<p className='text-muted-foreground'>Manage your service bookings</p>
 				</div>
 				<div className='flex items-center gap-2'>
 					<div className='relative w-full md:w-auto'>
@@ -340,9 +275,7 @@ export default function ClientBookingsPage() {
 							onChange={(e) => setSearchTerm(e.target.value)}
 						/>
 					</div>
-					<Link href='/services'>
-						<Button>Book New Service</Button>
-					</Link>
+					<Button onClick={fetchBookings}>Refresh</Button>
 				</div>
 			</div>
 
@@ -353,7 +286,8 @@ export default function ClientBookingsPage() {
 			>
 				<TabsList>
 					<TabsTrigger value='upcoming'>Upcoming</TabsTrigger>
-					<TabsTrigger value='past'>Past</TabsTrigger>
+					<TabsTrigger value='ongoing'>In Progress</TabsTrigger>
+					<TabsTrigger value='completed'>Completed</TabsTrigger>
 					<TabsTrigger value='cancelled'>Cancelled</TabsTrigger>
 				</TabsList>
 
@@ -367,38 +301,20 @@ export default function ClientBookingsPage() {
 								<p>Loading bookings...</p>
 							</CardContent>
 						</Card>
-					) : filteredBookings?.length === 0 ? (
+					) : filteredBookings.length === 0 ? (
 						<Card>
 							<CardContent className='flex flex-col items-center justify-center py-10 text-center'>
 								<Calendar className='h-10 w-10 text-muted-foreground mb-4' />
-								{searchTerm ? (
-									<>
-										<p className='mb-2 text-lg font-medium'>
-											No matching bookings found
-										</p>
-										<p className='text-muted-foreground'>
-											Try adjusting your search term
-										</p>
-									</>
-								) : (
-									<>
-										<p className='mb-2 text-lg font-medium'>
-											No {activeTab} bookings
-										</p>
-										<p className='text-muted-foreground mb-4'>
-											You do not have any {activeTab} service appointments
-										</p>
-										{activeTab === "upcoming" && (
-											<Link href='/services'>
-												<Button>Book a Service</Button>
-											</Link>
-										)}
-									</>
-								)}
+								<p className='mb-2 text-lg font-medium'>No bookings found</p>
+								<p className='text-muted-foreground'>
+									{searchTerm
+										? "Try adjusting your search term"
+										: `You don't have any ${activeTab} bookings`}
+								</p>
 							</CardContent>
 						</Card>
 					) : (
-						filteredBookings?.map((booking) => (
+						filteredBookings.map((booking) => (
 							<Card key={booking.id}>
 								<CardContent className='p-6'>
 									<div className='flex flex-col gap-4 md:flex-row md:items-center md:justify-between'>
@@ -415,7 +331,10 @@ export default function ClientBookingsPage() {
 												</Badge>
 											</div>
 											<p className='text-muted-foreground'>
-												{booking.providerName}
+												Client: {booking.clientName}
+											</p>
+											<p className='text-sm text-muted-foreground'>
+												{booking.clientEmail}
 											</p>
 										</div>
 										<div className='flex flex-col gap-1 md:items-end'>
@@ -436,16 +355,32 @@ export default function ClientBookingsPage() {
 											<span>{booking.duration} minutes</span>
 										</div>
 										<div className='flex justify-start md:justify-end'>
-											{booking.status === "in_progress" && (
+											{activeTab === "upcoming" && (
+												<Button
+													variant='outline'
+													size='sm'
+													className='flex items-center gap-2'
+													onClick={() => handleStartService(booking)}
+													disabled={
+														isUpdating && selectedBooking?.id === booking.id
+													}
+												>
+													<Play className='h-4 w-4' />
+													Start Service
+												</Button>
+											)}
+											{activeTab === "ongoing" && (
 												<Button
 													variant='outline'
 													size='sm'
 													className='flex items-center gap-2'
 													onClick={() => handleCompleteService(booking)}
-													disabled={isUpdating}
+													disabled={
+														isUpdating && selectedBooking?.id === booking.id
+													}
 												>
 													<CheckCircle className='h-4 w-4' />
-													Mark as Completed
+													Complete Service
 												</Button>
 											)}
 											<DropdownMenu>
@@ -462,158 +397,40 @@ export default function ClientBookingsPage() {
 												<DropdownMenuContent align='end'>
 													<DropdownMenuLabel>Actions</DropdownMenuLabel>
 													<DropdownMenuItem>View Details</DropdownMenuItem>
-													<DropdownMenuItem>Contact Provider</DropdownMenuItem>
-													{booking.status === "in_progress" && (
+													<DropdownMenuItem>Contact Client</DropdownMenuItem>
+													{activeTab === "upcoming" && (
+														<DropdownMenuItem
+															onClick={() => handleStartService(booking)}
+														>
+															Start Service
+														</DropdownMenuItem>
+													)}
+													{activeTab === "ongoing" && (
 														<DropdownMenuItem
 															onClick={() => handleCompleteService(booking)}
 														>
-															Mark as Completed
-														</DropdownMenuItem>
-													)}
-													{(booking.status === "pending" ||
-														booking.status === "confirmed") && (
-														<>
-															<DropdownMenuItem>Reschedule</DropdownMenuItem>
-															<DropdownMenuItem
-																className='text-destructive'
-																onClick={() => setSelectedBooking(booking)}
-															>
-																Cancel Booking
-															</DropdownMenuItem>
-														</>
-													)}
-													{booking.status === "completed" && (
-														<DropdownMenuItem asChild>
-															<Link
-																href={`/client-dashboard/reviews?service=${booking.serviceId}`}
-															>
-																Leave a Review
-															</Link>
+															Complete Service
 														</DropdownMenuItem>
 													)}
 												</DropdownMenuContent>
 											</DropdownMenu>
 										</div>
 									</div>
+
+									{booking.notes && (
+										<div className='mt-4 border-t pt-4'>
+											<p className='text-sm font-medium'>Notes:</p>
+											<p className='text-sm text-muted-foreground'>
+												{booking.notes}
+											</p>
+										</div>
+									)}
 								</CardContent>
 							</Card>
 						))
 					)}
 				</TabsContent>
 			</Tabs>
-
-			{/* Cancellation Dialog */}
-			<Dialog
-				open={!!selectedBooking}
-				onOpenChange={(open) => !open && setSelectedBooking(null)}
-			>
-				<DialogContent>
-					<DialogHeader>
-						<DialogTitle>Cancel Booking</DialogTitle>
-						<DialogDescription>
-							Are you sure you want to cancel this booking? This action cannot
-							be undone.
-						</DialogDescription>
-					</DialogHeader>
-					<div className='space-y-4 py-4'>
-						<div className='space-y-2'>
-							<p className='text-sm font-medium'>Booking Details:</p>
-							<p className='text-sm'>
-								{selectedBooking?.serviceName} on{" "}
-								{selectedBooking?.date?.toLocaleDateString()}
-							</p>
-						</div>
-						<div className='space-y-2'>
-							<label
-								htmlFor='reason'
-								className='text-sm font-medium'
-							>
-								Reason for cancellation (optional)
-							</label>
-							<Textarea
-								id='reason'
-								placeholder='Please provide a reason for cancellation'
-								value={cancellationReason}
-								onChange={(e) => setCancellationReason(e.target.value)}
-							/>
-						</div>
-					</div>
-					<DialogFooter>
-						<Button
-							variant='outline'
-							onClick={() => setSelectedBooking(null)}
-						>
-							Keep Booking
-						</Button>
-						<Button
-							variant='destructive'
-							onClick={handleCancelBooking}
-							disabled={isUpdating}
-						>
-							{isUpdating ? "Cancelling..." : "Cancel Booking"}
-						</Button>
-					</DialogFooter>
-				</DialogContent>
-			</Dialog>
-			<Dialog
-				open={!!reviewDialog}
-				onOpenChange={(open) => !open && setReviewDialog(null)}
-			>
-				<DialogContent className='sm:max-w-[425px]'>
-					<DialogHeader>
-						<DialogTitle>Write a Review</DialogTitle>
-						<DialogDescription>
-							Share your experience with {reviewBooking?.serviceName} by{" "}
-							{reviewBooking?.providerName}
-						</DialogDescription>
-					</DialogHeader>
-					<div className='grid gap-4 py-4'>
-						<div className='space-y-2'>
-							<Label htmlFor='rating'>Rating</Label>
-							<div className='flex gap-2'>
-								{[1, 2, 3, 4, 5].map((rating) => (
-									<Button
-										key={rating}
-										type='button'
-										variant={reviewRating === rating ? "default" : "outline"}
-										size='sm'
-										onClick={() => setReviewRating(rating)}
-										className='w-10 h-10 p-0'
-									>
-										{rating}
-									</Button>
-								))}
-							</div>
-						</div>
-						<div className='space-y-2'>
-							<Label htmlFor='comment'>Your Review</Label>
-							<Textarea
-								id='comment'
-								placeholder='Share your experience with this service...'
-								value={reviewText}
-								onChange={(e) => setReviewText(e.target.value)}
-								rows={4}
-							/>
-						</div>
-					</div>
-					<DialogFooter>
-						<Button
-							type='submit'
-							onClick={() => handleSubmitReview(reviewBooking)}
-							disabled={isSubmitting}
-						>
-							{isSubmitting ? (
-								<>
-									<Loader2 className='mr-2 h-4 w-4 animate-spin' />
-									Submitting...
-								</>
-							) : (
-								"Submit Review"
-							)}
-						</Button>
-					</DialogFooter>
-				</DialogContent>
-			</Dialog>
 		</div>
 	);
 }

@@ -129,14 +129,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				password
 			);
 			const user = userCredential.user;
-			console.log(user, "User logged in");
+			// console.log(user, "User logged in");
 
 			// Fetch user data from Firestore
 			const userDocRef = doc(db, "users", user.uid);
 			const userDoc = await getDoc(userDocRef);
 
 			if (userDoc.exists()) {
-				console.log(userDoc.data(), "User data fetched from Firestore");
+				// console.log(userDoc.data(), "User data fetched from Firestore");
 				// Set user data in state
 				setUserData(userDoc.data() as UserData);
 			} else {

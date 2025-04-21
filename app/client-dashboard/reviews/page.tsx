@@ -1,11 +1,12 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Edit, Search, Star, Trash } from "lucide-react";
+import { Edit, Search, Star, Trash, Loader2 } from "lucide-react";
 import {
 	Dialog,
 	DialogContent,
@@ -17,77 +18,74 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { useAuth } from "@/lib/auth-context";
+import { useToast } from "@/hooks/use-toast";
+import {
+	getClientReviews,
+	getPendingReviews,
+	createReview,
+	updateReview,
+	deleteReview,
+} from "@/lib/client-db";
 
 export default function ClientReviewsPage() {
 	const [searchTerm, setSearchTerm] = useState("");
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	const [editReview, setEditReview] = useState<any>(null);
 	const [reviewText, setReviewText] = useState("");
 	const [reviewRating, setReviewRating] = useState(5);
+	const [loading, setLoading] = useState(true);
+	const [publishedReviews, setPublishedReviews] = useState<any[]>([]);
+	const [pendingReviews, setPendingReviews] = useState<any[]>([]);
+	const [isSubmitting, setIsSubmitting] = useState(false);
+	const [isDeleting, setIsDeleting] = useState(false);
 
-	// Sample reviews data
-	const reviews = {
-		published: [
-			{
-				id: 1,
-				service: "Basic Home Cleaning",
-				provider: "Smith's Professional Services",
-				date: "May 20, 2023",
-				rating: 5,
-				comment:
-					"Excellent service! The cleaner was thorough and professional. My home has never looked better.",
-			},
-			{
-				id: 2,
-				service: "Plumbing Repair",
-				provider: "Garcia Home Services",
-				date: "May 15, 2023",
-				rating: 4,
-				comment:
-					"Good job fixing my leaky faucet. Arrived on time and completed the work efficiently.",
-			},
-			{
-				id: 3,
-				service: "Haircut and Style",
-				provider: "Serenity Spa & Beauty",
-				date: "May 5, 2023",
-				rating: 5,
-				comment:
-					"Love my new haircut! The stylist listened to what I wanted and delivered perfectly.",
-			},
-		],
-		pending: [
-			{
-				id: 4,
-				service: "Lawn Mowing",
-				provider: "Green Thumb Gardening",
-				date: "Yesterday",
-			},
-			{
-				id: 5,
-				service: "Electrical Outlet Installation",
-				provider: "Johnson's Electrical Solutions",
-				date: "Last week",
-			},
-		],
+	const { user } = useAuth();
+	const { toast } = useToast();
+
+	useEffect(() => {
+		if (user) {
+			loadReviews();
+		}
+	}, [user]);
+
+	const loadReviews = async () => {
+		if (!user) return;
+
+		setLoading(true);
+		try {
+			// Load published reviews
+			const reviews = await getClientReviews(user.uid);
+			setPublishedReviews(reviews);
+
+			// Load pending reviews (completed bookings without reviews)
+			const pending = await getPendingReviews(user.uid);
+			setPendingReviews(pending);
+		} catch (error) {
+			console.error("Error loading reviews:", error);
+			toast({
+				title: "Error",
+				description: "Failed to load reviews",
+				variant: "destructive",
+			});
+		} finally {
+			setLoading(false);
+		}
 	};
 
 	// Filter reviews based on search term
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	const filterReviews = (reviewList: any[]) => {
 		if (!searchTerm) return reviewList;
 
 		const term = searchTerm.toLowerCase();
 		return reviewList.filter(
 			(review) =>
-				review.service?.toLowerCase().includes(term) ||
-				review.provider?.toLowerCase().includes(term) ||
+				review.serviceName?.toLowerCase().includes(term) ||
+				review.providerName?.toLowerCase().includes(term) ||
 				review.comment?.toLowerCase().includes(term)
 		);
 	};
 
 	// Handle edit review
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	const handleEditReview = (review: any) => {
 		setEditReview(review);
 		setReviewText(review.comment);
@@ -95,26 +93,100 @@ export default function ClientReviewsPage() {
 	};
 
 	// Handle save review
-	const handleSaveReview = () => {
-		// In a real app, you would update the review in the database
-		console.log("Saving review:", {
-			...editReview,
-			comment: reviewText,
-			rating: reviewRating,
-		});
-		setEditReview(null);
+	const handleSaveReview = async () => {
+		if (!editReview || !user) return;
+
+		setIsSubmitting(true);
+		try {
+			await updateReview(editReview.id, {
+				comment: reviewText,
+				rating: reviewRating,
+			});
+
+			toast({
+				title: "Review updated",
+				description: "Your review has been updated successfully",
+			});
+
+			// Refresh reviews
+			loadReviews();
+			setEditReview(null);
+		} catch (error) {
+			console.error("Error updating review:", error);
+			toast({
+				title: "Error",
+				description: "Failed to update review",
+				variant: "destructive",
+			});
+		} finally {
+			setIsSubmitting(false);
+		}
 	};
 
 	// Handle submit new review
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	const handleSubmitReview = (pendingReview: any) => {
-		// In a real app, you would save the new review to the database
-		console.log("Submitting new review:", {
-			...pendingReview,
-			comment: reviewText,
-			rating: reviewRating,
-		});
-		setEditReview(null);
+	const handleSubmitReview = async (pendingReview: any) => {
+		if (!user) return;
+
+		setIsSubmitting(true);
+		try {
+			await createReview({
+				serviceId: pendingReview.serviceId,
+				serviceName: pendingReview.serviceName,
+				providerId: pendingReview.providerId,
+				providerName: pendingReview.providerName,
+				clientId: user.uid,
+				clientName: user.displayName || "Client",
+				rating: reviewRating,
+				comment: reviewText,
+			});
+
+			toast({
+				title: "Review submitted",
+				description: "Your review has been submitted successfully",
+			});
+
+			// Refresh reviews
+			loadReviews();
+			setEditReview(null);
+			setReviewText("");
+			setReviewRating(5);
+		} catch (error) {
+			console.error("Error submitting review:", error);
+			toast({
+				title: "Error",
+				description: "Failed to submit review",
+				variant: "destructive",
+			});
+		} finally {
+			setIsSubmitting(false);
+		}
+	};
+
+	// Handle delete review
+	const handleDeleteReview = async (reviewId: string) => {
+		if (!reviewId) return;
+
+		setIsDeleting(true);
+		try {
+			await deleteReview(reviewId);
+
+			toast({
+				title: "Review deleted",
+				description: "Your review has been deleted successfully",
+			});
+
+			// Refresh reviews
+			loadReviews();
+		} catch (error) {
+			console.error("Error deleting review:", error);
+			toast({
+				title: "Error",
+				description: "Failed to delete review",
+				variant: "destructive",
+			});
+		} finally {
+			setIsDeleting(false);
+		}
 	};
 
 	return (
@@ -142,10 +214,10 @@ export default function ClientReviewsPage() {
 			>
 				<TabsList>
 					<TabsTrigger value='published'>
-						Published Reviews ({reviews.published.length})
+						Published Reviews ({publishedReviews.length})
 					</TabsTrigger>
 					<TabsTrigger value='pending'>
-						Pending Reviews ({reviews.pending.length})
+						Pending Reviews ({pendingReviews.length})
 					</TabsTrigger>
 				</TabsList>
 
@@ -153,7 +225,13 @@ export default function ClientReviewsPage() {
 					value='published'
 					className='space-y-4'
 				>
-					{filterReviews(reviews.published).length === 0 ? (
+					{loading ? (
+						<Card>
+							<CardContent className='flex items-center justify-center py-10'>
+								<Loader2 className='h-8 w-8 animate-spin text-muted-foreground' />
+							</CardContent>
+						</Card>
+					) : filterReviews(publishedReviews).length === 0 ? (
 						<Card>
 							<CardContent className='flex flex-col items-center justify-center py-10 text-center'>
 								<Star className='h-10 w-10 text-muted-foreground mb-4' />
@@ -177,15 +255,17 @@ export default function ClientReviewsPage() {
 							</CardContent>
 						</Card>
 					) : (
-						filterReviews(reviews.published).map((review) => (
+						filterReviews(publishedReviews).map((review) => (
 							<Card key={review.id}>
 								<CardContent className='p-6'>
 									<div className='flex flex-col gap-4 md:flex-row md:items-start md:justify-between'>
 										<div className='space-y-1'>
 											<h3 className='font-semibold text-lg'>
-												{review.service}
+												{review.serviceName}
 											</h3>
-											<p className='text-muted-foreground'>{review.provider}</p>
+											<p className='text-muted-foreground'>
+												{review.providerName}
+											</p>
 											<div className='flex items-center mt-1'>
 												{[...Array(5)].map((_, i) => (
 													<Star
@@ -198,7 +278,9 @@ export default function ClientReviewsPage() {
 													/>
 												))}
 												<span className='ml-2 text-sm text-muted-foreground'>
-													{review.date}
+													{review.createdAt?.toDate
+														? review.createdAt.toDate().toLocaleDateString()
+														: "Recent"}
 												</span>
 											</div>
 										</div>
@@ -218,8 +300,8 @@ export default function ClientReviewsPage() {
 													<DialogHeader>
 														<DialogTitle>Edit Review</DialogTitle>
 														<DialogDescription>
-															Update your review for {review.service} by{" "}
-															{review.provider}
+															Update your review for {review.serviceName} by{" "}
+															{review.providerName}
 														</DialogDescription>
 													</DialogHeader>
 													<div className='grid gap-4 py-4'>
@@ -258,8 +340,16 @@ export default function ClientReviewsPage() {
 														<Button
 															type='submit'
 															onClick={handleSaveReview}
+															disabled={isSubmitting}
 														>
-															Save changes
+															{isSubmitting ? (
+																<>
+																	<Loader2 className='mr-2 h-4 w-4 animate-spin' />
+																	Saving...
+																</>
+															) : (
+																"Save changes"
+															)}
 														</Button>
 													</DialogFooter>
 												</DialogContent>
@@ -268,8 +358,14 @@ export default function ClientReviewsPage() {
 												variant='ghost'
 												size='sm'
 												className='text-destructive'
+												onClick={() => handleDeleteReview(review.id)}
+												disabled={isDeleting}
 											>
-												<Trash className='h-4 w-4 mr-2' />
+												{isDeleting ? (
+													<Loader2 className='h-4 w-4 animate-spin mr-2' />
+												) : (
+													<Trash className='h-4 w-4 mr-2' />
+												)}
 												Delete
 											</Button>
 										</div>
@@ -287,7 +383,13 @@ export default function ClientReviewsPage() {
 					value='pending'
 					className='space-y-4'
 				>
-					{filterReviews(reviews.pending).length === 0 ? (
+					{loading ? (
+						<Card>
+							<CardContent className='flex items-center justify-center py-10'>
+								<Loader2 className='h-8 w-8 animate-spin text-muted-foreground' />
+							</CardContent>
+						</Card>
+					) : filterReviews(pendingReviews).length === 0 ? (
 						<Card>
 							<CardContent className='flex flex-col items-center justify-center py-10 text-center'>
 								<Star className='h-10 w-10 text-muted-foreground mb-4' />
@@ -313,17 +415,22 @@ export default function ClientReviewsPage() {
 							</CardContent>
 						</Card>
 					) : (
-						filterReviews(reviews.pending).map((review) => (
-							<Card key={review.id}>
+						filterReviews(pendingReviews).map((booking) => (
+							<Card key={booking.id}>
 								<CardContent className='p-6'>
 									<div className='flex flex-col gap-4 md:flex-row md:items-center md:justify-between'>
 										<div className='space-y-1'>
 											<h3 className='font-semibold text-lg'>
-												{review.service}
+												{booking.serviceName}
 											</h3>
-											<p className='text-muted-foreground'>{review.provider}</p>
+											<p className='text-muted-foreground'>
+												{booking.providerName}
+											</p>
 											<p className='text-sm text-muted-foreground'>
-												Service completed: {review.date}
+												Service completed:{" "}
+												{booking.date?.toDate
+													? booking.date.toDate().toLocaleDateString()
+													: "Recently"}
 											</p>
 										</div>
 										<div>
@@ -335,8 +442,8 @@ export default function ClientReviewsPage() {
 													<DialogHeader>
 														<DialogTitle>Write a Review</DialogTitle>
 														<DialogDescription>
-															Share your experience with {review.service} by{" "}
-															{review.provider}
+															Share your experience with {booking.serviceName}{" "}
+															by {booking.providerName}
 														</DialogDescription>
 													</DialogHeader>
 													<div className='grid gap-4 py-4'>
@@ -375,9 +482,17 @@ export default function ClientReviewsPage() {
 													<DialogFooter>
 														<Button
 															type='submit'
-															onClick={() => handleSubmitReview(review)}
+															onClick={() => handleSubmitReview(booking)}
+															disabled={isSubmitting}
 														>
-															Submit Review
+															{isSubmitting ? (
+																<>
+																	<Loader2 className='mr-2 h-4 w-4 animate-spin' />
+																	Submitting...
+																</>
+															) : (
+																"Submit Review"
+															)}
 														</Button>
 													</DialogFooter>
 												</DialogContent>
