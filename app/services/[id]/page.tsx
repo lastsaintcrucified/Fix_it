@@ -39,7 +39,7 @@ export default function ServiceDetailsPage({
 	const [loading, setLoading] = useState(true);
 	const [bookingDate, setBookingDate] = useState("");
 
-	const { user } = useAuth();
+	const { user, userData } = useAuth();
 	const { toast } = useToast();
 	const router = useRouter();
 	const { id } = use(params);
@@ -164,7 +164,7 @@ export default function ServiceDetailsPage({
 				<div className='container flex h-16 items-center justify-between'>
 					<div className='flex items-center gap-2'>
 						<Shield className='h-6 w-6' />
-						<span className='text-xl font-bold'>ServiceHub</span>
+						<span className='text-xl font-bold'>Fix-it</span>
 					</div>
 					<nav className='hidden md:flex items-center gap-6 text-sm'>
 						<Link
@@ -194,7 +194,13 @@ export default function ServiceDetailsPage({
 					</nav>
 					<div className='flex items-center gap-4'>
 						{user ? (
-							<Link href='/dashboard'>
+							<Link
+								href={`${
+									userData?.role === "client"
+										? "/client-dashboard"
+										: "/dashboard"
+								}`}
+							>
 								<Button size='sm'>Dashboard</Button>
 							</Link>
 						) : (
@@ -388,17 +394,30 @@ export default function ServiceDetailsPage({
 											{provider.bio ||
 												"Professional service provider with years of experience in the industry."}
 										</p>
-										<Link
-											href={`/providers/${provider.id}`}
-											className='w-full'
-										>
-											<Button
-												variant='outline'
-												className='w-full'
+										<div className='flex gap-2 w-full'>
+											<Link
+												href={`/providers/${provider.id}`}
+												className='flex-1'
 											>
-												View Profile
-											</Button>
-										</Link>
+												<Button
+													variant='outline'
+													className='w-full'
+												>
+													View Profile
+												</Button>
+											</Link>
+											<Link
+												href={`/client-dashboard/messages?provider=${provider.id}`}
+												className='flex-1'
+											>
+												<Button
+													variant='default'
+													className='w-full'
+												>
+													Message
+												</Button>
+											</Link>
+										</div>
 									</CardContent>
 								</Card>
 							)}
@@ -411,10 +430,10 @@ export default function ServiceDetailsPage({
 				<div className='container flex flex-col items-center justify-between gap-4 md:flex-row'>
 					<div className='flex items-center gap-2'>
 						<Shield className='h-6 w-6' />
-						<span className='text-lg font-bold'>ServiceHub</span>
+						<span className='text-lg font-bold'>Fix-it</span>
 					</div>
 					<p className='text-sm text-muted-foreground'>
-						© {new Date().getFullYear()} ServiceHub. All rights reserved.
+						© {new Date().getFullYear()} Fix-it. All rights reserved.
 					</p>
 					<div className='flex gap-4'>
 						<Link

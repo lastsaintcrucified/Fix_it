@@ -192,7 +192,7 @@ export default function Home() {
 						<div className='flex flex-col items-center justify-center space-y-4 text-center'>
 							<div className='space-y-2'>
 								<h2 className='text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl'>
-									Why Choose ServiceHub
+									Why Choose Fix-it
 								</h2>
 								<p className='max-w-[900px] text-muted-foreground md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed'>
 									We are committed to providing the best experience for both
@@ -239,10 +239,10 @@ export default function Home() {
 				<div className='container flex flex-col items-center justify-between gap-4 md:flex-row'>
 					<div className='flex items-center gap-2'>
 						<Shield className='h-6 w-6' />
-						<span className='text-lg font-bold'>ServiceHub</span>
+						<span className='text-lg font-bold'>Fix-it</span>
 					</div>
 					<p className='text-sm text-muted-foreground'>
-						© {new Date().getFullYear()} ServiceHub. All rights reserved.
+						© {new Date().getFullYear()} Fix-it. All rights reserved.
 					</p>
 					<div className='flex gap-4'>
 						<Link

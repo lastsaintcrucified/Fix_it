@@ -123,7 +123,7 @@ export default function LoginPage() {
 					<CardFooter className='flex flex-col'>
 						<Button
 							type='submit'
-							className='w-full'
+							className='w-full mt-4'
 							disabled={isLoading}
 						>
 							{isLoading ? "Logging in..." : "Log in"}

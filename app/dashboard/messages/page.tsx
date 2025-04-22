@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Search, Send, Loader2, Plus, UserPlus } from "lucide-react";
+import { Search, Send, Loader2 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { db } from "@/lib/firebase";
 import {
@@ -28,26 +28,12 @@ import {
 	serverTimestamp,
 	onSnapshot,
 	Timestamp,
-	getDoc,
 } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
-import { useSearchParams } from "next/navigation";
-import {
-	Dialog,
-	DialogContent,
-	DialogDescription,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-	DialogTrigger,
-} from "@/components/ui/dialog";
 
-export default function ClientMessagesPage() {
+export default function ProviderMessagesPage() {
 	const { user } = useAuth();
 	const { toast } = useToast();
-	const searchParams = useSearchParams();
-	const providerId = searchParams.get("provider");
-
 	const [searchTerm, setSearchTerm] = useState("");
 	const [conversations, setConversations] = useState<any[]>([]);
 	const [filteredConversations, setFilteredConversations] = useState<any[]>([]);
@@ -55,28 +41,13 @@ export default function ClientMessagesPage() {
 	const [messages, setMessages] = useState<any[]>([]);
 	const [newMessage, setNewMessage] = useState("");
 	const [loading, setLoading] = useState(true);
-	const [newConversationOpen, setNewConversationOpen] = useState(false);
-	const [providers, setProviders] = useState<any[]>([]);
-	const [filteredProviders, setFilteredProviders] = useState<any[]>([]);
-	const [providerSearchTerm, setProviderSearchTerm] = useState("");
-	const [selectedProvider, setSelectedProvider] = useState<any>(null);
-	const [initialMessage, setInitialMessage] = useState("");
-	const [creatingConversation, setCreatingConversation] = useState(false);
 
 	// Fetch conversations when component mounts
 	useEffect(() => {
 		if (user) {
 			fetchConversations();
-			fetchProviders();
 		}
 	}, [user]);
-
-	// Handle provider ID from URL
-	useEffect(() => {
-		if (providerId && user) {
-			handleProviderFromUrl(providerId);
-		}
-	}, [providerId, user, conversations]);
 
 	// Filter conversations when search term changes
 	useEffect(() => {
@@ -84,13 +55,6 @@ export default function ClientMessagesPage() {
 			filterConversations();
 		}
 	}, [searchTerm, conversations]);
-
-	// Filter providers when search term changes
-	useEffect(() => {
-		if (providers.length > 0) {
-			filterProviders();
-		}
-	}, [providerSearchTerm, providers]);
 
 	// Subscribe to messages when a conversation is selected
 	useEffect(() => {
@@ -100,42 +64,6 @@ export default function ClientMessagesPage() {
 		}
 	}, [selectedConversation]);
 
-	const handleProviderFromUrl = async (providerId: string) => {
-		// Check if we already have a conversation with this provider
-		const existingConversation = conversations.find(
-			(conv) => conv.providerId === providerId
-		);
-
-		if (existingConversation) {
-			setSelectedConversation(existingConversation);
-			return;
-		}
-
-		// If not, fetch provider details and open new conversation dialog
-		try {
-			const providerDoc = await getDoc(doc(db, "users", providerId));
-
-			if (providerDoc.exists()) {
-				const providerData = { id: providerDoc.id, ...providerDoc.data() };
-				setSelectedProvider(providerData);
-				setNewConversationOpen(true);
-			} else {
-				toast({
-					title: "Provider not found",
-					description: "The provider you're trying to message doesn't exist",
-					variant: "destructive",
-				});
-			}
-		} catch (error) {
-			console.error("Error fetching provider:", error);
-			toast({
-				title: "Error",
-				description: "Failed to load provider details",
-				variant: "destructive",
-			});
-		}
-	};
-
 	const fetchConversations = async () => {
 		if (!user) return;
 
@@ -144,7 +72,7 @@ export default function ClientMessagesPage() {
 			const conversationsRef = collection(db, "conversations");
 			const q = query(
 				conversationsRef,
-				where("clientId", "==", user.uid),
+				where("providerId", "==", user.uid),
 				orderBy("updatedAt", "desc")
 			);
 
@@ -165,7 +93,7 @@ export default function ClientMessagesPage() {
 
 			setConversations(conversationsList);
 
-			// Select the first conversation by default if available and none is selected
+			// Select the first conversation by default if available
 			if (conversationsList.length > 0 && !selectedConversation) {
 				setSelectedConversation(conversationsList[0]);
 			}
@@ -181,25 +109,6 @@ export default function ClientMessagesPage() {
 		}
 	};
 
-	const fetchProviders = async () => {
-		try {
-			const providersRef = collection(db, "users");
-			const q = query(providersRef, where("role", "==", "provider"));
-
-			const querySnapshot = await getDocs(q);
-			const providersList: any[] = [];
-
-			querySnapshot.forEach((doc) => {
-				providersList.push({ id: doc.id, ...doc.data() });
-			});
-
-			setProviders(providersList);
-			setFilteredProviders(providersList);
-		} catch (error) {
-			console.error("Error fetching providers:", error);
-		}
-	};
-
 	const filterConversations = () => {
 		if (!conversations) return;
 
@@ -211,29 +120,11 @@ export default function ClientMessagesPage() {
 		const term = searchTerm.toLowerCase();
 		const filtered = conversations.filter(
 			(conversation) =>
-				conversation.providerName?.toLowerCase().includes(term) ||
+				conversation.clientName?.toLowerCase().includes(term) ||
 				conversation.lastMessage?.toLowerCase().includes(term)
 		);
 
 		setFilteredConversations(filtered);
-	};
-
-	const filterProviders = () => {
-		if (!providers) return;
-
-		if (!providerSearchTerm) {
-			setFilteredProviders(providers);
-			return;
-		}
-
-		const term = providerSearchTerm.toLowerCase();
-		const filtered = providers.filter(
-			(provider) =>
-				provider.displayName?.toLowerCase().includes(term) ||
-				provider.businessName?.toLowerCase().includes(term)
-		);
-
-		setFilteredProviders(filtered);
 	};
 
 	const subscribeToMessages = (conversationId: string) => {
@@ -280,12 +171,12 @@ export default function ClientMessagesPage() {
 				unreadCount: 0,
 			});
 
-			// Mark all provider messages as read
+			// Mark all client messages as read
 			const messagesRef = collection(db, "messages");
 			const q = query(
 				messagesRef,
 				where("conversationId", "==", conversationId),
-				where("senderType", "==", "provider"),
+				where("senderType", "==", "client"),
 				where("read", "==", false)
 			);
 
@@ -308,8 +199,8 @@ export default function ClientMessagesPage() {
 			await addDoc(collection(db, "messages"), {
 				conversationId: selectedConversation.id,
 				senderId: user.uid,
-				senderName: user.displayName || "Client",
-				senderType: "client",
+				senderName: user.displayName || "Provider",
+				senderType: "provider",
 				text: newMessage,
 				createdAt: serverTimestamp(),
 				read: false,
@@ -321,7 +212,7 @@ export default function ClientMessagesPage() {
 				lastMessage: newMessage,
 				lastMessageDate: serverTimestamp(),
 				updatedAt: serverTimestamp(),
-				unreadCount: 1, // Provider has 1 unread message
+				unreadCount: 1, // Client has 1 unread message
 			});
 
 			// Clear the input
@@ -333,96 +224,6 @@ export default function ClientMessagesPage() {
 				description: "Failed to send message",
 				variant: "destructive",
 			});
-		}
-	};
-
-	const handleCreateConversation = async () => {
-		if (!user || !selectedProvider || !initialMessage.trim()) return;
-
-		setCreatingConversation(true);
-
-		try {
-			// Check if conversation already exists
-			const conversationsRef = collection(db, "conversations");
-			const q = query(
-				conversationsRef,
-				where("clientId", "==", user.uid),
-				where("providerId", "==", selectedProvider.id)
-			);
-
-			const querySnapshot = await getDocs(q);
-			let conversationId: string;
-
-			if (querySnapshot.empty) {
-				// Create new conversation
-				const newConversation = {
-					clientId: user.uid,
-					clientName: user.displayName || "Client",
-					providerId: selectedProvider.id,
-					providerName:
-						selectedProvider.displayName || selectedProvider.businessName,
-					lastMessage: initialMessage,
-					lastMessageDate: serverTimestamp(),
-					unreadCount: 1, // Provider has 1 unread message
-					createdAt: serverTimestamp(),
-					updatedAt: serverTimestamp(),
-				};
-
-				const docRef = await addDoc(conversationsRef, newConversation);
-				conversationId = docRef.id;
-			} else {
-				// Use existing conversation
-				conversationId = querySnapshot.docs[0].id;
-
-				// Update conversation
-				await updateDoc(doc(db, "conversations", conversationId), {
-					lastMessage: initialMessage,
-					lastMessageDate: serverTimestamp(),
-					updatedAt: serverTimestamp(),
-					unreadCount: 1, // Provider has 1 unread message
-				});
-			}
-
-			// Add message
-			await addDoc(collection(db, "messages"), {
-				conversationId,
-				senderId: user.uid,
-				senderName: user.displayName || "Client",
-				senderType: "client",
-				text: initialMessage,
-				createdAt: serverTimestamp(),
-				read: false,
-			});
-
-			// Refresh conversations and select the new one
-			await fetchConversations();
-
-			// Find the new conversation in the list
-			const newConversation = conversations.find(
-				(c) => c.providerId === selectedProvider.id
-			);
-			if (newConversation) {
-				setSelectedConversation(newConversation);
-			}
-
-			// Reset state
-			setNewConversationOpen(false);
-			setSelectedProvider(null);
-			setInitialMessage("");
-
-			toast({
-				title: "Conversation started",
-				description: "Your message has been sent",
-			});
-		} catch (error) {
-			console.error("Error creating conversation:", error);
-			toast({
-				title: "Error",
-				description: "Failed to start conversation",
-				variant: "destructive",
-			});
-		} finally {
-			setCreatingConversation(false);
 		}
 	};
 
@@ -447,130 +248,9 @@ export default function ClientMessagesPage() {
 
 	return (
 		<div className='flex flex-col gap-6 h-[calc(100vh-10rem)]'>
-			<div className='flex flex-col gap-2 md:flex-row md:items-center md:justify-between'>
-				<div>
-					<h1 className='text-3xl font-bold tracking-tight'>Messages</h1>
-					<p className='text-muted-foreground'>
-						Communicate with your service providers
-					</p>
-				</div>
-				<Dialog
-					open={newConversationOpen}
-					onOpenChange={setNewConversationOpen}
-				>
-					<DialogTrigger asChild>
-						<Button className='flex items-center gap-2'>
-							<UserPlus className='h-4 w-4' />
-							New Message
-						</Button>
-					</DialogTrigger>
-					<DialogContent className='sm:max-w-[425px]'>
-						<DialogHeader>
-							<DialogTitle>New Message</DialogTitle>
-							<DialogDescription>
-								Start a conversation with a service provider
-							</DialogDescription>
-						</DialogHeader>
-						<div className='grid gap-4 py-4'>
-							{selectedProvider ? (
-								<div className='flex items-center gap-3 p-2 border rounded-md'>
-									<Avatar className='h-10 w-10'>
-										<AvatarFallback>
-											{selectedProvider.displayName?.charAt(0) || "P"}
-										</AvatarFallback>
-									</Avatar>
-									<div>
-										<p className='font-medium'>
-											{selectedProvider.displayName}
-										</p>
-										<p className='text-sm text-muted-foreground'>
-											{selectedProvider.businessName || "Service Provider"}
-										</p>
-									</div>
-									<Button
-										variant='ghost'
-										size='sm'
-										className='ml-auto'
-										onClick={() => setSelectedProvider(null)}
-									>
-										Change
-									</Button>
-								</div>
-							) : (
-								<div className='space-y-2'>
-									<label className='text-sm font-medium'>Select Provider</label>
-									<div className='relative'>
-										<Search className='absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground' />
-										<Input
-											placeholder='Search providers...'
-											className='pl-8'
-											value={providerSearchTerm}
-											onChange={(e) => setProviderSearchTerm(e.target.value)}
-										/>
-									</div>
-									<div className='max-h-[200px] overflow-y-auto border rounded-md'>
-										{filteredProviders.length === 0 ? (
-											<div className='p-4 text-center text-sm text-muted-foreground'>
-												No providers found
-											</div>
-										) : (
-											filteredProviders.map((provider) => (
-												<div
-													key={provider.id}
-													className='flex items-center gap-3 p-3 hover:bg-muted cursor-pointer border-b last:border-0'
-													onClick={() => setSelectedProvider(provider)}
-												>
-													<Avatar className='h-8 w-8'>
-														<AvatarFallback>
-															{provider.displayName?.charAt(0) || "P"}
-														</AvatarFallback>
-													</Avatar>
-													<div>
-														<p className='font-medium'>
-															{provider.displayName}
-														</p>
-														<p className='text-xs text-muted-foreground'>
-															{provider.businessName || "Service Provider"}
-														</p>
-													</div>
-												</div>
-											))
-										)}
-									</div>
-								</div>
-							)}
-							<div className='space-y-2'>
-								<label className='text-sm font-medium'>Message</label>
-								<Textarea
-									placeholder='Type your message...'
-									value={initialMessage}
-									onChange={(e) => setInitialMessage(e.target.value)}
-									rows={4}
-								/>
-							</div>
-						</div>
-						<DialogFooter>
-							<Button
-								type='submit'
-								onClick={handleCreateConversation}
-								disabled={
-									!selectedProvider ||
-									!initialMessage.trim() ||
-									creatingConversation
-								}
-							>
-								{creatingConversation ? (
-									<>
-										<Loader2 className='mr-2 h-4 w-4 animate-spin' />
-										Sending...
-									</>
-								) : (
-									"Send Message"
-								)}
-							</Button>
-						</DialogFooter>
-					</DialogContent>
-				</Dialog>
+			<div className='flex flex-col gap-2'>
+				<h1 className='text-3xl font-bold tracking-tight'>Messages</h1>
+				<p className='text-muted-foreground'>Communicate with your clients</p>
 			</div>
 
 			<div className='grid grid-cols-1 md:grid-cols-3 gap-6 flex-1 min-h-0'>
@@ -604,17 +284,6 @@ export default function ClientMessagesPage() {
 										? "No conversations found"
 										: "No conversations yet"}
 								</p>
-								{!searchTerm && (
-									<Button
-										variant='outline'
-										size='sm'
-										className='mt-2'
-										onClick={() => setNewConversationOpen(true)}
-									>
-										<Plus className='h-4 w-4 mr-2' />
-										Start a conversation
-									</Button>
-								)}
 							</div>
 						) : (
 							<div className='divide-y'>
@@ -631,10 +300,10 @@ export default function ClientMessagesPage() {
 										<Avatar className='h-10 w-10'>
 											<AvatarImage
 												src='/placeholder-user.jpg'
-												alt={conversation.providerName}
+												alt={conversation.clientName}
 											/>
 											<AvatarFallback>
-												{conversation.providerName
+												{conversation.clientName
 													?.split(" ")
 													.map((n: string) => n[0])
 													.join("")}
@@ -643,7 +312,7 @@ export default function ClientMessagesPage() {
 										<div className='flex-1 min-w-0'>
 											<div className='flex justify-between items-baseline'>
 												<h4 className='font-medium truncate'>
-													{conversation.providerName}
+													{conversation.clientName}
 												</h4>
 												<span className='text-xs text-muted-foreground whitespace-nowrap ml-2'>
 													{conversation.updatedAt
@@ -674,10 +343,10 @@ export default function ClientMessagesPage() {
 									<Avatar className='h-10 w-10'>
 										<AvatarImage
 											src='/placeholder-user.jpg'
-											alt={selectedConversation.providerName}
+											alt={selectedConversation.clientName}
 										/>
 										<AvatarFallback>
-											{selectedConversation.providerName
+											{selectedConversation.clientName
 												?.split(" ")
 												.map((n: string) => n[0])
 												.join("")}
@@ -685,9 +354,9 @@ export default function ClientMessagesPage() {
 									</Avatar>
 									<div>
 										<CardTitle className='text-lg'>
-											{selectedConversation.providerName}
+											{selectedConversation.clientName}
 										</CardTitle>
-										<CardDescription>Service Provider</CardDescription>
+										<CardDescription>Client</CardDescription>
 									</div>
 								</div>
 							</CardHeader>
@@ -704,14 +373,14 @@ export default function ClientMessagesPage() {
 										<div
 											key={message.id}
 											className={`flex ${
-												message.senderType === "client"
+												message.senderType === "provider"
 													? "justify-end"
 													: "justify-start"
 											}`}
 										>
 											<div
 												className={`max-w-[80%] rounded-lg p-3 ${
-													message.senderType === "client"
+													message.senderType === "provider"
 														? "bg-primary text-primary-foreground"
 														: "bg-muted"
 												}`}
@@ -758,16 +427,8 @@ export default function ClientMessagesPage() {
 								Select a conversation to view messages
 							</p>
 							<p className='text-sm text-muted-foreground'>
-								Or start a new conversation with a service provider
+								Or wait for clients to contact you
 							</p>
-							<Button
-								variant='outline'
-								className='mt-4'
-								onClick={() => setNewConversationOpen(true)}
-							>
-								<UserPlus className='h-4 w-4 mr-2' />
-								New Conversation
-							</Button>
 						</div>
 					)}
 				</Card>

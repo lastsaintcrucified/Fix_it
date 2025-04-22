@@ -196,7 +196,7 @@ export default function SignupPage() {
 					<CardFooter>
 						<Button
 							type='submit'
-							className='w-full'
+							className='w-full mt-4'
 							disabled={isLoading}
 						>
 							{isLoading ? "Creating account..." : "Create account"}
